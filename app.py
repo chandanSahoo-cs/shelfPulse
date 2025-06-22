@@ -26,22 +26,31 @@ def predict():
     data = request.json
 
     try:
-        # Convert input to model-ready numpy array
-        # Ensure the order of features is consistent with training
-        spoilage_features = np.array([
-            data["Historical_Sell_Through"],
-            data["Forecasted_Demand"],
-            data["Spoilage_Risk_Score"],
-            data["Cold_Chain_Energy_Use"],
-            data["Sensor_Anomalies"],
-            data["Markdown_History"],
-            data["Transport_Emissions"],
-            data["Recyclability_Score"],
-            data["Overstock_Risk"],
-            data["Stockout_Risk"],
-            data["Waste_Risk_Index"]
-        ]).reshape(1, -1)
+        # Optional flag (defaults to True if missing)
+        is_perishable = data.get("is_perishable", True)
 
+        # -------- Spoilage Prediction --------
+        if is_perishable:
+            spoilage_features = np.array([
+                data["Historical_Sell_Through"],
+                data["Forecasted_Demand"],
+                data["Spoilage_Risk_Score"],
+                data["Cold_Chain_Energy_Use"],
+                data["Sensor_Anomalies"],
+                data["Markdown_History"],
+                data["Transport_Emissions"],
+                data["Recyclability_Score"],
+                data["Overstock_Risk"],
+                data["Stockout_Risk"],
+                data["Waste_Risk_Index"]
+            ]).reshape(1, -1)
+            spoilage_pred = spoilage_encoder.inverse_transform(
+                spoilage_model.predict(spoilage_features)
+            )[0]
+        else:
+            spoilage_pred = "Green"  # Default for non-perishables
+
+        # -------- Expiry Prediction --------
         expiry_features = np.array([
             data["Historical_Sell_Through"],
             data["Forecasted_Demand"],
@@ -55,7 +64,9 @@ def predict():
             data["Stockout_Risk"],
             data["Waste_Risk_Index"]
         ]).reshape(1, -1)
+        expiry_pred = int(expiry_model.predict(expiry_features)[0])
 
+        # -------- Demand Prediction --------
         demand_features = np.array([
             data["Historical_Sell_Through"],
             data["Days_to_Expiry"],
@@ -70,7 +81,9 @@ def predict():
             data["Recyclability_Score"],
             data["Markdown_History"]
         ]).reshape(1, -1)
+        demand_pred = round(float(demand_model.predict(demand_features)[0]), 2)
 
+        # -------- Dead Stock Prediction --------
         dead_stock_features = np.array([
             data["Days_Since_Last_Sale"],
             data["Average_Turnover_Time"],
@@ -83,7 +96,9 @@ def predict():
             data["Overstock_Risk"],
             data["Stockout_Risk"]
         ]).reshape(1, -1)
+        dead_stock_pred = bool(dead_stock_model.predict(dead_stock_features)[0])
 
+        # -------- Markdown Trigger Prediction --------
         markdown_features = np.array([
             data["Spoilage_Risk_Score"],
             data["Days_to_Expiry"],
@@ -96,7 +111,9 @@ def predict():
             data["Sensor_Anomalies"],
             data["Waste_Risk_Index"]
         ]).reshape(1, -1)
+        markdown_pred = bool(markdown_model.predict(markdown_features)[0])
 
+        # -------- Sustainability Label Prediction --------
         sustainability_features = np.array([
             data["Embedded_Carbon_Footprint"],
             data["Cold_Chain_Energy_Use"],
@@ -107,14 +124,9 @@ def predict():
             data["Take_Back_Eligible"],
             data["Footprint_Factor"]
         ]).reshape(1, -1)
-
-        # Predictions
-        spoilage_pred = spoilage_encoder.inverse_transform(spoilage_model.predict(spoilage_features))[0]
-        expiry_pred = int(expiry_model.predict(expiry_features)[0])
-        demand_pred = round(float(demand_model.predict(demand_features)[0]), 2)
-        dead_stock_pred = bool(dead_stock_model.predict(dead_stock_features)[0])
-        markdown_pred = bool(markdown_model.predict(markdown_features)[0])
-        sustainability_pred = sustainability_encoder.inverse_transform(sustainability_model.predict(sustainability_features))[0]
+        sustainability_pred = sustainability_encoder.inverse_transform(
+            sustainability_model.predict(sustainability_features)
+        )[0]
 
         return jsonify({
             "spoilage_risk": spoilage_pred,
