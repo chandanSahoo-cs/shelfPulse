@@ -174,3 +174,11 @@ def run_cache_from_api():
         return jsonify({"status": "success", "message": "Predictions cached and updated."})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+#-------------
+# Health Check
+#-------------
+
+@router.route("/", methods=["GET"])
+def home():
+    return "✅ ShelfPulse API is live"
