@@ -1,5 +1,15 @@
+# Core server
 flask
-numpy
+flask-cors
+
+# ML stack
 pandas
+numpy
 scikit-learn
-gunicorn
+joblib
+
+# Database access
+sqlalchemy
+psycopg2-binary
+
+
