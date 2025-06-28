@@ -27,7 +27,7 @@ def _parse_value(val):
 # -----------------------
 # 1. Predict Single JSON
 # -----------------------
-@router.route("/predict", methods=["POST"])
+@router.route("/predict/api/v1", methods=["POST"])
 def predict_api():
     try:
         json_data = request.get_json()
@@ -44,7 +44,7 @@ def predict_api():
 # -----------------------
 # 2. Predict from CSV
 # -----------------------
-@router.route("/predict_csv", methods=["POST"])
+@router.route("/predict_csv/api/v1", methods=["POST"])
 def predict_csv():
     if "file" not in request.files:
         return jsonify({"error": "CSV file is required under 'file' field"}), 400
@@ -79,7 +79,7 @@ def predict_csv():
 # -----------------------
 # 3. Get Product by SKU
 # -----------------------
-@router.route("/product/<sku>", methods=["GET"])
+@router.route("/product/<sku>/api/v1", methods=["GET"])
 def get_product_by_sku(sku):
     db = SessionLocal()
     product = db.query(Product).filter(Product.sku == sku).first()
@@ -112,7 +112,7 @@ def get_product_by_sku(sku):
 # -----------------------
 # 4. Get Filtered Products (Mass Query)
 # -----------------------
-@router.route("/products", methods=["GET"])
+@router.route("/products/api/v1", methods=["GET"])
 def get_filtered_products():
     db = SessionLocal()
     query = db.query(Product, Prediction).join(Prediction).filter(Prediction.is_latest == True)
@@ -167,7 +167,7 @@ def get_filtered_products():
 #------------------
 # Cache Prediction
 #------------------
-@router.route("/run_cache", methods=["POST"])
+@router.route("/run_cache/api/v1", methods=["POST"])
 def run_cache_from_api():
     try:
         run_batch_prediction_and_cache()

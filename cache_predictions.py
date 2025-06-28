@@ -6,46 +6,59 @@ from sqlalchemy.exc import SQLAlchemyError
 
 def run_batch_prediction_and_cache():
     db = SessionLocal()
+    success_count = 0
+    failure_count = 0
+
     try:
         products = db.query(Product).all()
 
         for product in products:
-            # Extract product data into a dict (excluding SQLAlchemy internals)
-            row_dict = {
-                k: v for k, v in product.__dict__.items()
-                if not k.startswith("_") and k not in ["id", "sku", "predictions"]
-            }
-            row_df = pd.DataFrame([row_dict])
+            try:
+                # Prepare product data as a row dict
+                row_dict = {
+                    k: v for k, v in product.__dict__.items()
+                    if not k.startswith("_") and k not in ["id", "sku", "predictions"]
+                }
+                row_df = pd.DataFrame([row_dict])
 
-            # Predict using your existing function
-            pred = predict_single_product(row_df)
+                # Run prediction
+                pred = predict_single_product(row_df)
+                print(f"🧠 Prediction for {product.sku} → {pred}")
 
-            # Mark existing latest prediction as old
-            db.query(Prediction).filter(
-                Prediction.product_id == product.id,
-                Prediction.is_latest == True
-            ).update({Prediction.is_latest: False})
+                # Mark old predictions as stale
+                db.query(Prediction).filter(
+                    Prediction.product_id == product.id,
+                    Prediction.is_latest == True
+                ).update({Prediction.is_latest: False}, synchronize_session=False)
 
-            # Create and store new prediction
-            new_pred = Prediction(
-                product_id=product.id,
-                spoilage_risk=pred["spoilage_risk"],
-                days_to_expiry_pred=pred["days_to_expiry"],
-                forecasted_demand_pred=pred["forecasted_demand"],
-                dead_stock=pred["dead_stock"],
-                trigger_markdown=pred["trigger_markdown"],
-                sustainability_label=pred["sustainability_label"],
-                is_latest=True
-            )
+                # Create and add new prediction
+                new_pred = Prediction(
+                    product_id=product.id,
+                    spoilage_risk=str(pred["spoilage_risk"]),
+                    days_to_expiry_pred=int(pred["days_to_expiry"]),
+                    forecasted_demand_pred=float(pred["forecasted_demand"]),
+                    dead_stock=bool(pred["dead_stock"]),
+                    trigger_markdown=bool(pred["trigger_markdown"]),
+                    sustainability_label=str(pred["sustainability_label"]),
+                    is_latest=True
+                )
 
-            db.add(new_pred)
+
+                db.add(new_pred)
+                print(f"✅ New prediction added for {product.sku}")
+
+                success_count += 1
+
+            except Exception as inner_e:
+                print(f"❌ Failed to predict for product SKU: {product.sku} — {inner_e}")
+                failure_count += 1
 
         db.commit()
-        print("✅ Cached predictions updated for all products.")
+        print(f"✅ Cached predictions updated. Success: {success_count}, Failed: {failure_count}")
 
-    except SQLAlchemyError as e:
+    except SQLAlchemyError as db_error:
         db.rollback()
-        print("❌ Database error during caching:", e)
+        print("❌ Fatal DB error during prediction run:", db_error)
 
     finally:
         db.close()
