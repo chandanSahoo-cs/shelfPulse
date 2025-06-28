@@ -1,15 +1,36 @@
 from flask import Blueprint, request, jsonify, send_file
+from db import SessionLocal
+from models import Product, Prediction
+from predict import predict_single_product
 import pandas as pd
 import tempfile
-from predict import predict_single_product
+from cache_predictions import run_batch_prediction_and_cache
 
 router = Blueprint("router", __name__)
 
+# -----------------------
+# Util: Safe type parser
+# -----------------------
+def _parse_value(val):
+    try:
+        return int(val)
+    except:
+        try:
+            return float(val)
+        except:
+            if val.lower() == "true":
+                return True
+            if val.lower() == "false":
+                return False
+            return val
+
+# -----------------------
+# 1. Predict Single JSON
+# -----------------------
 @router.route("/predict", methods=["POST"])
 def predict_api():
     try:
         json_data = request.get_json()
-
         if not json_data:
             return jsonify({"error": "No JSON received"}), 400
 
@@ -20,7 +41,9 @@ def predict_api():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
+# -----------------------
+# 2. Predict from CSV
+# -----------------------
 @router.route("/predict_csv", methods=["POST"])
 def predict_csv():
     if "file" not in request.files:
@@ -40,29 +63,29 @@ def predict_csv():
             prediction = predict_single_product(row_df)
             results.append(prediction)
 
-        # Merge predictions
         output_df = pd.concat([df.reset_index(drop=True), pd.DataFrame(results)], axis=1)
 
         # Save to temp file
-        import tempfile, os
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
         output_path = tmp.name
         output_df.to_csv(output_path, index=False)
         tmp.close()
 
-        # ✅ This triggers actual download
-        from flask import send_file
         return send_file(output_path, as_attachment=True, download_name="predicted_output.csv", mimetype='text/csv')
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# -----------------------
+# 3. Get Product by SKU
+# -----------------------
 @router.route("/product/<sku>", methods=["GET"])
 def get_product_by_sku(sku):
     db = SessionLocal()
     product = db.query(Product).filter(Product.sku == sku).first()
 
     if not product:
+        db.close()
         return jsonify({"error": "Product not found"}), 404
 
     prediction = db.query(Prediction).filter(
@@ -74,10 +97,21 @@ def get_product_by_sku(sku):
 
     return jsonify({
         "sku": product.sku,
-        "features": {k: getattr(product, k) for k in product.__table__.columns.keys() if k not in ["id", "sku"]},
-        "prediction": {k: getattr(prediction, k) for k in prediction.__table__.columns.keys() if k not in ["id", "product_id", "is_latest", "created_at"]}
+        "features": {
+            k: getattr(product, k)
+            for k in product.__table__.columns.keys()
+            if k not in ["id", "sku"]
+        },
+        "prediction": {
+            k: getattr(prediction, k)
+            for k in prediction.__table__.columns.keys()
+            if k not in ["id", "product_id", "is_latest", "created_at"]
+        }
     })
 
+# -----------------------
+# 4. Get Filtered Products (Mass Query)
+# -----------------------
 @router.route("/products", methods=["GET"])
 def get_filtered_products():
     db = SessionLocal()
@@ -85,11 +119,9 @@ def get_filtered_products():
 
     args = request.args
 
-    # Base field mappings
     product_fields = [c.name for c in Product.__table__.columns]
     prediction_fields = [c.name for c in Prediction.__table__.columns]
 
-    # Support for exact and range filters
     for param, val in args.items():
         if param in product_fields:
             query = query.filter(getattr(Product, param) == _parse_value(val))
@@ -108,7 +140,6 @@ def get_filtered_products():
             elif base in prediction_fields:
                 query = query.filter(getattr(Prediction, base) < _parse_value(val))
 
-    # Pagination
     limit = int(args.get("limit", 100))
     offset = int(args.get("offset", 0))
     query = query.limit(limit).offset(offset)
@@ -133,16 +164,13 @@ def get_filtered_products():
         for product, prediction in results
     ])
 
-def _parse_value(val):
-    # Try int, then float, then keep as string
+#------------------
+# Cache Prediction
+#------------------
+@router.route("/run_cache", methods=["POST"])
+def run_cache_from_api():
     try:
-        return int(val)
-    except:
-        try:
-            return float(val)
-        except:
-            if val.lower() == "true":
-                return True
-            if val.lower() == "false":
-                return False
-            return val
+        run_batch_prediction_and_cache()
+        return jsonify({"status": "success", "message": "Predictions cached and updated."})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
