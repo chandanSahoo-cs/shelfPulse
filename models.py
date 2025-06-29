@@ -2,7 +2,7 @@ from sqlalchemy import Column, Integer, Float, String, Boolean, ForeignKey, Date
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
-from db import Base 
+from db import Base
 
 class Product(Base):
     __tablename__ = 'products'
@@ -52,8 +52,11 @@ class Prediction(Base):
     days_to_expiry_pred = Column(Integer)
     forecasted_demand_pred = Column(Float)
     dead_stock = Column(Boolean)
-    trigger_markdown = Column(Boolean)
-    sustainability_label = Column(String)
 
+    # ✅ Replaced logic
+    suggested_markdown_percent = Column(Float)
+    trigger_markdown = Column(Boolean)  # Optional: keep if needed for API filtering
+
+    sustainability_label = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
     is_latest = Column(Boolean, default=True)

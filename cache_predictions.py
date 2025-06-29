@@ -25,28 +25,27 @@ def run_batch_prediction_and_cache():
                 pred = predict_single_product(row_df)
                 print(f"🧠 Prediction for {product.sku} → {pred}")
 
-                # Mark old predictions as stale
+                # Mark old predictions as not latest
                 db.query(Prediction).filter(
                     Prediction.product_id == product.id,
                     Prediction.is_latest == True
                 ).update({Prediction.is_latest: False}, synchronize_session=False)
 
-                # Create and add new prediction
+                # Create new prediction
                 new_pred = Prediction(
                     product_id=product.id,
                     spoilage_risk=str(pred["spoilage_risk"]),
                     days_to_expiry_pred=int(pred["days_to_expiry"]),
                     forecasted_demand_pred=float(pred["forecasted_demand"]),
                     dead_stock=bool(pred["dead_stock"]),
+                    suggested_markdown_percent=float(pred["suggested_markdown_percent"]),
                     trigger_markdown=bool(pred["trigger_markdown"]),
                     sustainability_label=str(pred["sustainability_label"]),
                     is_latest=True
                 )
 
-
                 db.add(new_pred)
                 print(f"✅ New prediction added for {product.sku}")
-
                 success_count += 1
 
             except Exception as inner_e:
@@ -54,7 +53,7 @@ def run_batch_prediction_and_cache():
                 failure_count += 1
 
         db.commit()
-        print(f"✅ Cached predictions updated. Success: {success_count}, Failed: {failure_count}")
+        print(f"🎯 Batch Prediction Summary → Success: {success_count}, Failed: {failure_count}")
 
     except SQLAlchemyError as db_error:
         db.rollback()
@@ -62,7 +61,6 @@ def run_batch_prediction_and_cache():
 
     finally:
         db.close()
-
 
 if __name__ == "__main__":
     run_batch_prediction_and_cache()
