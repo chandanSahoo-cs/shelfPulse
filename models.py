@@ -1,5 +1,4 @@
 from sqlalchemy import Column, Integer, Float, String, Boolean, ForeignKey, DateTime
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from db import Base
@@ -9,6 +8,8 @@ class Product(Base):
 
     id = Column(Integer, primary_key=True)
     sku = Column(String, unique=True, nullable=False)
+
+    category = Column(String, nullable=True)
 
     # Features
     Historical_Sell_Through = Column(Float)
@@ -53,9 +54,8 @@ class Prediction(Base):
     forecasted_demand_pred = Column(Float)
     dead_stock = Column(Boolean)
 
-    # ✅ Replaced logic
     suggested_markdown_percent = Column(Float)
-    trigger_markdown = Column(Boolean)  # Optional: keep if needed for API filtering
+    trigger_markdown = Column(Boolean)
 
     sustainability_label = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)

@@ -23,7 +23,7 @@ def run_batch_prediction_and_cache():
 
                 # Run prediction
                 pred = predict_single_product(row_df)
-                print(f"🧠 Prediction for {product.sku} → {pred}")
+                print(f"Prediction for {product.sku} → {pred}")
 
                 # Mark old predictions as not latest
                 db.query(Prediction).filter(
@@ -45,19 +45,19 @@ def run_batch_prediction_and_cache():
                 )
 
                 db.add(new_pred)
-                print(f"✅ New prediction added for {product.sku}")
+                print(f"New prediction added for {product.sku}")
                 success_count += 1
 
             except Exception as inner_e:
-                print(f"❌ Failed to predict for product SKU: {product.sku} — {inner_e}")
+                print(f"Failed to predict for product SKU: {product.sku} — {inner_e}")
                 failure_count += 1
 
         db.commit()
-        print(f"🎯 Batch Prediction Summary → Success: {success_count}, Failed: {failure_count}")
+        print(f"Batch Prediction Summary → Success: {success_count}, Failed: {failure_count}")
 
     except SQLAlchemyError as db_error:
         db.rollback()
-        print("❌ Fatal DB error during prediction run:", db_error)
+        print("Fatal DB error during prediction run:", db_error)
 
     finally:
         db.close()

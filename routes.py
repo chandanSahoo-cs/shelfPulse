@@ -181,4 +181,4 @@ def run_cache_from_api():
 
 @router.route("/", methods=["GET"])
 def home():
-    return "✅ ShelfPulse API is live"
+    return "ShelfPulse API is live"
