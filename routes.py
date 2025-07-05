@@ -119,25 +119,18 @@ def get_filtered_products():
 
     args = request.args
 
-    product_fields = [c.name for c in Product.__table__.columns]
     prediction_fields = [c.name for c in Prediction.__table__.columns]
 
     for param, val in args.items():
-        if param in product_fields:
-            query = query.filter(getattr(Product, param) == _parse_value(val))
-        elif param in prediction_fields:
+        if param in prediction_fields:
             query = query.filter(getattr(Prediction, param) == _parse_value(val))
         elif param.endswith("_gt"):
             base = param[:-3]
-            if base in product_fields:
-                query = query.filter(getattr(Product, base) > _parse_value(val))
-            elif base in prediction_fields:
+            if base in prediction_fields:
                 query = query.filter(getattr(Prediction, base) > _parse_value(val))
         elif param.endswith("_lt"):
             base = param[:-3]
-            if base in product_fields:
-                query = query.filter(getattr(Product, base) < _parse_value(val))
-            elif base in prediction_fields:
+            if base in prediction_fields:
                 query = query.filter(getattr(Prediction, base) < _parse_value(val))
 
     limit = int(args.get("limit", 100))
